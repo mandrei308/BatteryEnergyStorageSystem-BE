@@ -3,7 +3,7 @@
 using Api;
 using Api.Models;
 
-using NPOI.HSSF.UserModel;
+using ExcelDataReader;
 
 namespace Tests;
 
@@ -23,10 +23,10 @@ public class EnergyAlgoTests
     {
         EntryData entryData = new
         (
-            InitialEnergy: 10,
+            InitialEnergy: 12,
             Capacity: 24,
             MaximumPower: 6,
-            Lines: ReadXls("data/18_a.csv")
+            Lines: ReadExcel("data/10_a.xls")
         );
 
         var sellTimestamp = new DateTime(2024, 9, 18, 9, 0, 0);
@@ -66,23 +66,21 @@ public class EnergyAlgoTests
         return entries;
     }
 
-    public static List<Line> ReadXls(string filePath)
+    public static List<Line> ReadExcel(string filePath)
     {
+        System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
         var entries = new List<Line>();
-        var culture = new CultureInfo("en-US");
-        using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read))
+        using (var stream = File.Open(filePath, FileMode.Open, FileAccess.Read))
+        using (var reader = ExcelReaderFactory.CreateReader(stream))
         {
-            var workbook = new HSSFWorkbook(fs);
-            var sheet = workbook.GetSheetAt(0);
-            for (int i = 1; i <= sheet.LastRowNum; i++) // skip header row
+            var result = reader.AsDataSet();
+            var table = result.Tables[0];
+            for (int i = 1; i < table.Rows.Count; i++) // skip header
             {
-                var row = sheet.GetRow(i);
-                if (row == null) continue;
-
-                var entry = new Line
-                (
-                    Timestamp: DateTime.Parse(row.GetCell(0).ToString()!, culture),
-                    Price: double.Parse(row.GetCell(1).ToString()!, NumberStyles.Any, culture)
+                var row = table.Rows[i];
+                var entry = new Line(
+                    Timestamp: DateTime.Parse(row[0].ToString()!),
+                    Price: double.Parse(row[1].ToString()!)
                 );
                 entries.Add(entry);
             }
