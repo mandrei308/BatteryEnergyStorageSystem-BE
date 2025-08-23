@@ -6,12 +6,14 @@ public static class Algorithm
 {
     public static TransactionResult CalculateOptimalInterval(EntryData data)
     {
-        if (data.InitialEnergy == 0)
+        var intervalPower = data.MaximumPower / 4.0;
+
+        if (data.InitialEnergy < intervalPower)
         {
             return CalculateBuyFirst(data.Lines);
         }
 
-        if (data.InitialEnergy == data.Capacity)
+        if (data.InitialEnergy > data.Capacity - intervalPower)
         {
             return CalculateSellFirst(data.Lines);
         }
@@ -112,11 +114,11 @@ public static class Algorithm
             Sell: lines[maxIdx].Timestamp);
     }
 
-    public static TransactionResult CalculateOneCycle(EntryData data, int intervalCount)
+    public static TransactionResult CalculateOneCycle(EntryData data)
     {
         // edge case energy < energyToBeTraded | ...
         double intervalPower = data.MaximumPower / 4.0;
-        double energyToBeTraded = intervalPower * intervalCount;
+        double energyToBeTraded = intervalPower * data.Intervals;
         // var pre = PrecomputePrices(data.Lines, intervalCount).ToList();
 
         // if (data.InitialEnergy < energyToBeTraded)
@@ -132,13 +134,13 @@ public static class Algorithm
         var maxProfit = 0.0;
         var bestCycle = new TransactionResult(DateTime.MinValue, DateTime.MinValue);
 
-        var windowsCount = data.Lines.Count - intervalCount + 1;
+        var windowsCount = data.Lines.Count - data.Intervals + 1;
 
         for (int i = 0; i < windowsCount; i++)
         {
             for (int j = 0; j < windowsCount; j++)
             {
-                if (i == j || Math.Abs(i - j) < intervalCount) continue;
+                if (i == j || Math.Abs(i - j) < data.Intervals) continue;
 
                 double currentEnergy = data.InitialEnergy;
                 var profit = 0.0;
@@ -146,8 +148,8 @@ public static class Algorithm
 
                 for (int k = 0; k < data.Lines.Count; k++)
                 {
-                    var isBuyWindow = k >= i && k < i + intervalCount;
-                    var isSellWindow = k >= j && k < j + intervalCount;
+                    var isBuyWindow = k >= i && k < i + data.Intervals;
+                    var isSellWindow = k >= j && k < j + data.Intervals;
 
                     if (isBuyWindow)
                     {
