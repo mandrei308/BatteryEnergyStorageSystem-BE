@@ -1,3 +1,5 @@
+using System.Transactions;
+
 using Api.Models;
 
 namespace Api;
@@ -190,23 +192,130 @@ public static class Algorithm
         // return CalculateMinMax(pre);
     }
 
-    private static EnergyData[] PrecomputePrices(List<EnergyData> lines, int len)
+    public static (TransactionResult, TransactionResult) CalculateTwoCycles(EntryData data)
     {
-        EnergyData[] sum = new EnergyData[lines.Count - len + 1];
+        double intervalPower = data.MaximumPower / 4.0;
+        double energyToBeTraded = intervalPower * data.Intervals;
 
-        double initSum = 0;
-        for (int i = 0; i < len && i < lines.Count; i++)
+        var bestTotalProfit = 0.0;
+        var bestFirstCycle = new TransactionResult(DateTime.MinValue, DateTime.MinValue);
+        var bestSecondCycle = new TransactionResult(DateTime.MinValue, DateTime.MinValue);
+
+        var windowsCount = data.Lines.Count - data.Intervals + 1;
+
+        for (int split = data.Intervals * 2; split < data.Lines.Count - data.Intervals * 2; split++)
         {
-            initSum += lines[i].Price;
+            var maxFirstProfit = 0.0;
+            var bestFirst = new TransactionResult(DateTime.MinValue, DateTime.MinValue);
+
+            for (int i = 0; i < split - data.Intervals; i++)
+            {
+                for (int j = 0; j < split - data.Intervals; j++)
+                {
+                    if (i == j || Math.Abs(i - j) < data.Intervals) continue;
+
+                    double currentEnergy = data.InitialEnergy;
+                    var profit = 0.0;
+                    var isValidCycle = true;
+
+                    for (int k = 0; k < split; k++)
+                    {
+                        bool isBuyWindow = k >= i && k < i + data.Intervals;
+                        bool isSellWindow = k >= j && k < j + data.Intervals;
+
+                        if (isBuyWindow)
+                        {
+                            if (currentEnergy + intervalPower > data.Capacity)
+                            {
+                                isValidCycle = false;
+                                break;
+                            }
+                            currentEnergy += intervalPower;
+                            profit -= data.Lines[k].Price * intervalPower;
+                        }
+                        else if (isSellWindow)
+                        {
+                            if (currentEnergy - intervalPower < 0)
+                            {
+                                isValidCycle = false;
+                                break;
+                            }
+                            currentEnergy -= intervalPower;
+                            profit += data.Lines[k].Price * intervalPower;
+                        }
+                    }
+
+                    if (isValidCycle && profit > maxFirstProfit)
+                    {
+                        maxFirstProfit = profit;
+                        bestFirst = new TransactionResult(
+                            Buy: data.Lines[i].Timestamp,
+                            Sell: data.Lines[j].Timestamp);
+                    }
+                }
+            }
+
+            var maxSecondProfit = 0.0;
+            var bestSecond = new TransactionResult(DateTime.MinValue, DateTime.MinValue);
+
+            for (int i = split; i < data.Lines.Count - data.Intervals; i++)
+            {
+                for (int j = split; j < data.Lines.Count - data.Intervals; j++)
+                {
+                    if (i == j || Math.Abs(i - j) < data.Intervals) continue;
+
+                    double currentEnergy = data.InitialEnergy;
+                    var profit = 0.0;
+                    var isValidCycle = true;
+
+                    for (int k = split; k < data.Lines.Count; k++)
+                    {
+                        bool isBuyWindow = k >= i && k < i + data.Intervals;
+                        bool isSellWindow = k >= j && k < j + data.Intervals;
+
+                        if (isBuyWindow)
+                        {
+                            if (currentEnergy + intervalPower > data.Capacity)
+                            {
+                                isValidCycle = false;
+                                break;
+                            }
+
+                            currentEnergy += intervalPower;
+                            profit -= data.Lines[k].Price * intervalPower;
+                        }
+                        else if (isSellWindow)
+                        {
+                            if (currentEnergy - intervalPower < 0)
+                            {
+                                isValidCycle = false;
+                                break;
+                            }
+
+                            currentEnergy -= intervalPower;
+                            profit += data.Lines[k].Price * intervalPower;
+                        }
+                    }
+
+                    if (isValidCycle && profit > maxSecondProfit)
+                    {
+                        maxSecondProfit = profit;
+                        bestSecond = new TransactionResult(
+                            Buy: data.Lines[i].Timestamp,
+                            Sell: data.Lines[j].Timestamp);
+                    }
+                }
+            }
+
+            var totalProfit = maxFirstProfit + maxSecondProfit;
+            if (totalProfit > bestTotalProfit)
+            {
+                bestTotalProfit = totalProfit;
+                bestFirstCycle = bestFirst;
+                bestSecondCycle = bestSecond;
+            }
         }
 
-        sum[0] = new EnergyData(lines[0].Timestamp, initSum);
-        for (int i = 1; i <= lines.Count - len; i++)
-        {
-            sum[i] = new EnergyData(lines[i].Timestamp,
-                sum[i - 1].Price - lines[i - 1].Price + lines[i + len - 1].Price);
-        }
-
-        return sum;
+        return (bestFirstCycle, bestSecondCycle);
     }
 }

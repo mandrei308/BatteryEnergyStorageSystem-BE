@@ -71,4 +71,42 @@ public class AlgorithmTests
             new TransactionResult(Buy: new DateTime(2024, 9, 10, 4, 15, 0), Sell: new DateTime(2024, 9, 10, 20, 30, 0))
         }
     };
+
+    [Theory, MemberData(nameof(TwoCyclesCases))]
+    public void TestCalculateTwoCycles(string file, int initialEnergy, int cap, int maxPower, int intervalCount,
+        (TransactionResult, TransactionResult) expected)
+    {
+        // Arrange
+        EntryData entryData = new(
+            InitialEnergy: initialEnergy,
+            Capacity: cap,
+            MaximumPower: maxPower,
+            Intervals: intervalCount,
+            Lines: ExcelUtils.Read(file));
+
+        // Act
+        var actual = Algorithm.CalculateTwoCycles(entryData);
+
+        // Assert
+        Assert.Equal(expected, actual);
+    }
+
+    public static TheoryData<string, int, int, int, int, (TransactionResult, TransactionResult)> TwoCyclesCases = new()
+    {
+        {
+            "data/18_c.xls", 10, 24, 6, 4,
+            (
+                new TransactionResult(Buy: new DateTime(2024, 9, 18, 15, 15, 0), Sell: new DateTime(2024, 9, 18, 20, 0, 0)),
+                new TransactionResult(Buy: new DateTime(2024, 9, 18, 9, 15, 0), Sell: new DateTime(2024, 9, 18, 14, 0, 0))
+            )
+        },
+        {
+            "data/10_c.xls", 12, 24, 6, 4,
+            (
+                new TransactionResult(Buy: new DateTime(2024, 9, 10, 4, 15, 0), Sell: new DateTime(2024, 9, 10, 20, 30, 0)),
+                new TransactionResult(Buy: new DateTime(2024, 9, 10, 0, 45, 0), Sell: new DateTime(2024, 9, 10, 21, 0, 0))
+            )
+        }
+    };
+
 }
