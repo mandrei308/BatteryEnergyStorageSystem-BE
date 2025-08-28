@@ -53,7 +53,8 @@ public static class Algorithm
 
         return new TransactionResult(
             Buy: lines[buyIdx].Timestamp,
-            Sell: lines[sellIdx].Timestamp);
+            Sell: lines[sellIdx].Timestamp,
+            Profit: maxProfit);
     }
 
     private static TransactionResult CalculateSellFirst(List<EnergyData> lines, int cycleOffset = 0)
@@ -86,7 +87,8 @@ public static class Algorithm
 
         return new TransactionResult(
             Buy: lines[buyIdx].Timestamp,
-            Sell: lines[sellIdx].Timestamp);
+            Sell: lines[sellIdx].Timestamp,
+            Profit: maxProfit);
     }
 
     private static TransactionResult CalculateMinMax(List<EnergyData> lines, int cycleOffset = 0)
@@ -113,28 +115,16 @@ public static class Algorithm
 
         return new TransactionResult(
             Buy: lines[minIdx].Timestamp,
-            Sell: lines[maxIdx].Timestamp);
+            Sell: lines[maxIdx].Timestamp,
+            Profit: maxPrice - minPrice);
     }
 
     public static TransactionResult CalculateOneCycle(EntryData data)
     {
-        // edge case energy < energyToBeTraded | ...
         double intervalPower = data.MaximumPower / 4.0;
-        double energyToBeTraded = intervalPower * data.Intervals;
-        // var pre = PrecomputePrices(data.Lines, intervalCount).ToList();
-
-        // if (data.InitialEnergy < energyToBeTraded)
-        // {
-        //     return CalculateBuyFirst(pre, intervalCount);
-        // }
-
-        // if (data.InitialEnergy >= data.Capacity)
-        // {
-        //     return CalculateSellFirst(pre, intervalCount);
-        // }
 
         var maxProfit = 0.0;
-        var bestCycle = new TransactionResult(DateTime.MinValue, DateTime.MinValue);
+        var bestCycle = new TransactionResult(DateTime.MinValue, DateTime.MinValue, 0);
 
         var windowsCount = data.Lines.Count - data.Intervals + 1;
 
@@ -182,31 +172,27 @@ public static class Algorithm
                     maxProfit = profit;
                     bestCycle = new TransactionResult(
                         Buy: data.Lines[i].Timestamp,
-                        Sell: data.Lines[j].Timestamp);
+                        Sell: data.Lines[j].Timestamp,
+                        Profit: maxProfit);
                 }
             }
         }
 
         return bestCycle;
-
-        // return CalculateMinMax(pre);
     }
 
     public static (TransactionResult, TransactionResult) CalculateTwoCycles(EntryData data)
     {
         double intervalPower = data.MaximumPower / 4.0;
-        double energyToBeTraded = intervalPower * data.Intervals;
 
         var bestTotalProfit = 0.0;
-        var bestFirstCycle = new TransactionResult(DateTime.MinValue, DateTime.MinValue);
-        var bestSecondCycle = new TransactionResult(DateTime.MinValue, DateTime.MinValue);
-
-        var windowsCount = data.Lines.Count - data.Intervals + 1;
+        var bestFirstCycle = new TransactionResult(DateTime.MinValue, DateTime.MinValue, 0);
+        var bestSecondCycle = new TransactionResult(DateTime.MinValue, DateTime.MinValue, 0);
 
         for (int split = data.Intervals * 2; split < data.Lines.Count - data.Intervals * 2; split++)
         {
             var maxFirstProfit = 0.0;
-            var bestFirst = new TransactionResult(DateTime.MinValue, DateTime.MinValue);
+            var bestFirst = new TransactionResult(DateTime.MinValue, DateTime.MinValue, 0);
 
             for (int i = 0; i < split - data.Intervals; i++)
             {
@@ -250,13 +236,14 @@ public static class Algorithm
                         maxFirstProfit = profit;
                         bestFirst = new TransactionResult(
                             Buy: data.Lines[i].Timestamp,
-                            Sell: data.Lines[j].Timestamp);
+                            Sell: data.Lines[j].Timestamp,
+                            Profit: maxFirstProfit);
                     }
                 }
             }
 
             var maxSecondProfit = 0.0;
-            var bestSecond = new TransactionResult(DateTime.MinValue, DateTime.MinValue);
+            var bestSecond = new TransactionResult(DateTime.MinValue, DateTime.MinValue, 0);
 
             for (int i = split; i < data.Lines.Count - data.Intervals; i++)
             {
@@ -302,7 +289,8 @@ public static class Algorithm
                         maxSecondProfit = profit;
                         bestSecond = new TransactionResult(
                             Buy: data.Lines[i].Timestamp,
-                            Sell: data.Lines[j].Timestamp);
+                            Sell: data.Lines[j].Timestamp,
+                            Profit: maxSecondProfit);
                     }
                 }
             }

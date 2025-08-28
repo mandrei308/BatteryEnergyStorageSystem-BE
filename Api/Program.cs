@@ -12,8 +12,16 @@ builder.Services.AddOpenApi();
 builder.Services.AddLogging();
 builder.Services.AddHealthChecks();
 
+
+builder.Services.AddCors(options => options.AddPolicy("AllowFrontend",
+        policy => policy.WithOrigins("http://localhost:5173")
+                        .AllowAnyHeader()
+                        .AllowAnyMethod()));
+
 var app = builder.Build();
 
+
+app.UseCors("AllowFrontend");
 app.UseHttpsRedirection();
 app.UseHealthChecks("/health");
 
@@ -39,12 +47,24 @@ app.MapPost("/calculate/{algorithm}",
         Intervals: intervals,
         Lines: lines);
 
-    return algorithm switch
+    (TransactionResult?, TransactionResult?) result = algorithm switch
     {
-        "interval" => Results.Ok(Algorithm.CalculateOptimalInterval(entryData)),
-        "oneCycle" => Results.Ok(Algorithm.CalculateOneCycle(entryData)),
-        _ => Results.BadRequest("Unknown algorithm")
+        "interval" => (Algorithm.CalculateOptimalInterval(entryData), null),
+        "oneCycle" => (Algorithm.CalculateOneCycle(entryData), null),
+        "twoCycles" => Algorithm.CalculateTwoCycles(entryData),
+        _ => (null, null)
     };
+
+    var r = new Response
+    (
+        FirstCycle: result.Item1,
+        SecondCycle: result.Item2,
+        Lines: lines
+    );
+
+    return r.FirstCycle == null && r.SecondCycle == null
+        ? Results.BadRequest("Invalid algorithm specified.")
+        : Results.Ok(r);
 })
 .DisableAntiforgery();
 
